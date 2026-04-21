@@ -62,7 +62,7 @@
 ## 🚀 快速开始
 
 ### 在线体验
-👉 [https://你的用户名.github.io/cherrystudio-web](https://你的用户名.github.io/cherrystudio-web)
+👉 [https://skywalk163.github.io/CherryStudioWeb/cherrystudio.html](https://skywalk163.github.io/CherryStudioWeb/cherrystudio.html)
 
 ### 本地使用
 ```bash
