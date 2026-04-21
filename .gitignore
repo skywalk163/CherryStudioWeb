@@ -65,3 +65,6 @@ coverage/
 
 # Local history
 .history/
+
+# .workbuddy
+.workbuddy/
