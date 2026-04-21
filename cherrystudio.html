@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CherryStudio Web — AI 聚合</title>
+  <style>
+    :root {
+      --bg-primary: #1a1a2e;
+      --bg-secondary: #16213e;
+      --bg-card: #0f3460;
+      --accent: #e94560;
+      --accent-hover: #c73652;
+      --accent-light: rgba(233,69,96,0.15);
+      --text-primary: #e0e6f0;
+      --text-secondary: #8899aa;
+      --text-muted: #556070;
+      --border: #2a3a5a;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --font: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      --header-h: 56px;
+      --sidebar-w: 260px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body { font-family: var(--font); background: var(--bg-primary); color: var(--text-primary); display: flex; flex-direction: column; }
+
+    /* 顶部导航 */
+    #header {
+      height: var(--header-h);
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; padding: 0 16px; gap: 12px;
+      flex-shrink: 0; z-index: 100;
+    }
+    #header .logo { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; color: var(--accent); }
+    #header .logo svg { width: 28px; height: 28px; }
+    #header .spacer { flex: 1; }
+    #header .btn-icon {
+      width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer;
+      background: transparent; color: var(--text-secondary); display: flex;
+      align-items: center; justify-content: center; transition: background .2s, color .2s;
+    }
+    #header .btn-icon:hover { background: var(--accent-light); color: var(--accent); }
+    #header .sidebar-toggle { display: none; }
+
+    /* 主体布局 */
+    #app { display: flex; flex: 1; overflow: hidden; }
+
+    /* 侧边栏 */
+    #sidebar {
+      width: var(--sidebar-w);
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      flex-shrink: 0; transition: transform .3s ease; z-index: 90;
+    }
+    #sidebar .sidebar-header {
+      padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    #sidebar .sidebar-header span { font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; }
+    #service-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .service-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer;
+      margin-bottom: 4px; transition: background .15s; font-size: 14px;
+    }
+    .service-item:hover { background: var(--bg-card); }
+    .service-item.active { background: var(--accent-light); color: var(--accent); }
+    .service-item .svc-icon {
+      width: 28px; height: 28px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .service-item .svc-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .service-item .svc-tag {
+      font-size: 10px; padding: 2px 6px; border-radius: 10px;
+      background: rgba(76,175,80,.2); color: #4caf50;
+    }
+    .service-item .svc-tag.limited { background: rgba(255,152,0,.15); color: #ff9800; }
+    #sidebar .sidebar-footer {
+      padding: 12px 16px; border-top: 1px solid var(--border);
+      font-size: 11px; color: var(--text-muted); text-align: center;
+    }
+
+    /* 内容区 */
+    #content { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+    /* iframe 容器 */
+    #iframe-container {
+      flex: 1; position: relative; background: #000;
+    }
+    #iframe-container iframe {
+      width: 100%; height: 100%; border: none; background: #fff;
+    }
+
+    /* 无法嵌入提示 */
+    #fallback-view {
+      position: absolute; inset: 0; background: var(--bg-secondary);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      gap: 20px; padding: 40px; text-align: center;
+    }
+    #fallback-view.show { display: flex; }
+    #fallback-view .fallback-icon { font-size: 64px; }
+    #fallback-view h3 { font-size: 20px; color: var(--text-primary); }
+    #fallback-view p { font-size: 14px; color: var(--text-secondary); max-width: 400px; line-height: 1.7; }
+    #fallback-view .btn-open {
+      background: var(--accent); color: #fff; border: none;
+      border-radius: var(--radius-sm); padding: 12px 28px;
+      font-size: 15px; cursor: pointer; text-decoration: none;
+      transition: background .2s; display: inline-flex; align-items: center; gap: 8px;
+    }
+    #fallback-view .btn-open:hover { background: var(--accent-hover); }
+
+    /* 加载指示器 */
+    #loading {
+      position: absolute; inset: 0; background: var(--bg-secondary);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; z-index: 10;
+    }
+    #loading.hide { display: none; }
+    .spinner {
+      width: 40px; height: 40px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { color: var(--text-secondary); font-size: 14px; }
+
+    /* 响应式 */
+    @media (max-width: 768px) {
+      :root { --sidebar-w: 100%; }
+      #sidebar { position: fixed; top: var(--header-h); left: 0; bottom: 0; transform: translateX(-100%); }
+      #sidebar.open { transform: translateX(0); box-shadow: 0 0 40px rgba(0,0,0,.5); }
+      #header .sidebar-toggle { display: flex; }
+    }
+  </style>
+</head>
+<body>
+
+<header id="header">
+  <button class="btn-icon sidebar-toggle" id="btn-sidebar-toggle" title="切换侧边栏">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+  <div class="logo">
+    <svg viewBox="0 0 36 36" fill="none">
+      <circle cx="18" cy="18" r="18" fill="#e94560"/>
+      <path d="M11 14 Q18 8 25 14 Q28 18 25 22 Q18 28 11 22 Q8 18 11 14Z" fill="white" opacity=".9"/>
+      <circle cx="18" cy="18" r="4" fill="#e94560"/>
+    </svg>
+    CherryStudio Web
+  </div>
+  <div class="spacer"></div>
+  <button class="btn-icon" id="btn-reload" title="刷新当前页面">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+      <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+    </svg>
+  </button>
+</header>
+
+<div id="app">
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <span>AI 服务</span>
+    </div>
+    <div id="service-list"></div>
+    <div class="sidebar-footer">
+      点击服务切换 · 数据保存在浏览器本地
+    </div>
+  </aside>
+
+  <main id="content">
+    <div id="iframe-container">
+      <iframe id="ai-frame" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-storage-access-by-user-activation"></iframe>
+      
+      <div id="loading">
+        <div class="spinner"></div>
+        <p>正在加载 AI 服务...</p>
+      </div>
+
+      <div id="fallback-view">
+        <div class="fallback-icon">🚫</div>
+        <h3>该服务无法在当前页面嵌入</h3>
+        <p>由于安全限制（X-Frame-Options），该 AI 平台禁止在 iframe 中显示。请点击下方按钮在新标签页中打开。</p>
+        <a id="fallback-link" href="#" target="_blank" class="btn-open">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/>
+          </svg>
+          在新窗口打开
+        </a>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// =============================================
+// AI 服务配置（官方网页版）
+// =============================================
+const AI_SERVICES = [
+  // 国内主流（大概率可嵌入）
+  {
+    id: 'doubao',
+    name: '豆包',
+    url: 'https://www.doubao.com/chat/',
+    icon: '🟡',
+    desc: '字节跳动出品，完全免费',
+    tag: '免费',
+    embed: true
+  },
+  {
+    id: 'kimi',
+    name: 'Kimi',
+    url: 'https://kimi.moonshot.cn/',
+    icon: '🌙',
+    desc: 'Moonshot，长文本能力强',
+    tag: '免费',
+    embed: true
+  },
+  {
+    id: 'wenxin',
+    name: '文心一言',
+    url: 'https://yiyan.baidu.com/',
+    icon: '🔷',
+    desc: '百度文心大模型',
+    tag: '免费',
+    embed: true
+  },
+  {
+    id: 'tongyi',
+    name: '通义千问',
+    url: 'https://tongyi.aliyun.com/qianwen/',
+    icon: '⚡',
+    desc: '阿里通义系列',
+    tag: '免费',
+    embed: true
+  },
+  {
+    id: 'baixiaoying',
+    name: '百小应',
+    url: 'https://chat.baichuan-ai.com/',
+    icon: '🅱️',
+    desc: '百川智能',
+    tag: '免费',
+    embed: true
+  },
+  {
+    id: 'zhipu',
+    name: '智谱清言',
+    url: 'https://chatglm.cn/',
+    icon: '💎',
+    desc: 'GLM-4 系列模型',
+    tag: '免费',
+    embed: true
+  },
+  {
+    id: 'hailuo',
+    name: '海螺 AI',
+    url: 'https://hailuoai.com/',
+    icon: '🐚',
+    desc: 'MiniMax 出品',
+    tag: '免费',
+    embed: true
+  },
+  {
+    id: 'yuanbao',
+    name: '腾讯元宝',
+    url: 'https://yuanbao.tencent.com/',
+    icon: '💠',
+    desc: '腾讯混元大模型',
+    tag: '免费',
+    embed: true
+  },
+  {
+    id: 'spark',
+    name: '讯飞星火',
+    url: 'https://xinghuo.xfyun.cn/',
+    icon: '🔥',
+    desc: '科大讯飞',
+    tag: '免费',
+    embed: true
+  },
+  {
+    id: 'tiangong',
+    name: '天工 AI',
+    url: 'https://www.tiangong.cn/',
+    icon: '⛩️',
+    desc: '昆仑万维',
+    tag: '免费',
+    embed: true
+  },
+  {
+    id: 'shangliang',
+    name: '商量',
+    url: 'https://chat.sensetime.com/',
+    icon: '🟢',
+    desc: '商汤日日新',
+    tag: '免费',
+    embed: true
+  },
+  {
+    id: 'metaso',
+    name: '秘塔 AI 搜索',
+    url: 'https://metaso.cn/',
+    icon: '🔍',
+    desc: 'AI 搜索引擎',
+    tag: '免费',
+    embed: true
+  },
+  // 国际/开源
+  {
+    id: 'qwenchat',
+    name: 'QwenChat',
+    url: 'https://chat.qwen.ai/',
+    icon: '🌐',
+    desc: '通义千问国际版',
+    tag: '免费',
+    embed: true
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    url: 'https://chat.deepseek.com/',
+    icon: '🐋',
+    desc: '深度求索，国产最强',
+    tag: '免费',
+    embed: true
+  },
+  {
+    id: 'poe',
+    name: 'Poe',
+    url: 'https://poe.com/',
+    icon: '🤖',
+    desc: 'Quora 出品，多模型聚合',
+    tag: '免费/限',
+    tagClass: 'limited',
+    embed: false  // 大概率被阻止
+  },
+  {
+    id: 'groq',
+    name: 'Groq',
+    url: 'https://chat.groq.com/',
+    icon: '⚡',
+    desc: '超快推理，Llama3',
+    tag: '免费',
+    embed: false
+  },
+  {
+    id: 'perplexity',
+    name: 'Perplexity',
+    url: 'https://www.perplexity.ai/',
+    icon: '❓',
+    desc: 'AI 搜索引擎',
+    tag: '免费/限',
+    tagClass: 'limited',
+    embed: false
+  },
+  {
+    id: 'claude',
+    name: 'Claude',
+    url: 'https://claude.ai/',
+    icon: '🟣',
+    desc: 'Anthropic 出品',
+    tag: '免费/限',
+    tagClass: 'limited',
+    embed: false
+  },
+  {
+    id: 'gemini',
+    name: 'Gemini',
+    url: 'https://gemini.google.com/',
+    icon: '🔮',
+    desc: 'Google 出品',
+    tag: '免费/限',
+    tagClass: 'limited',
+    embed: false
+  },
+  {
+    id: 'chatgpt',
+    name: 'ChatGPT',
+    url: 'https://chat.openai.com/',
+    icon: '🟩',
+    desc: 'OpenAI 官方',
+    tag: '免费/限',
+    tagClass: 'limited',
+    embed: false
+  },
+  {
+    id: 'copilot',
+    name: 'GitHub Copilot',
+    url: 'https://github.com/copilot',
+    icon: '👨‍💻',
+    desc: '微软 Copilot',
+    tag: '限免',
+    tagClass: 'limited',
+    embed: false
+  },
+  {
+    id: 'grok',
+    name: 'Grok',
+    url: 'https://grok.x.ai/',
+    icon: '𝕏',
+    desc: 'X (Twitter) 出品',
+    tag: '付费',
+    tagClass: 'limited',
+    embed: false
+  },
+  {
+    id: 'genspark',
+    name: 'Genspark',
+    url: 'https://www.genspark.ai/',
+    icon: '✨',
+    desc: '多 Agent 协作',
+    tag: '免费/限',
+    tagClass: 'limited',
+    embed: false
+  },
+  {
+    id: 'duckduckgo',
+    name: 'DuckDuckGo AI',
+    url: 'https://duckduckgo.com/?q=DuckDuckGo+AI+Chat&ia=chat',
+    icon: '🦆',
+    desc: '隐私优先 AI',
+    tag: '免费',
+    embed: false
+  },
+  {
+    id: 'coze',
+    name: 'Coze',
+    url: 'https://www.coze.com/',
+    icon: '🎭',
+    desc: '字节 Bot 平台',
+    tag: '免费',
+    embed: false
+  },
+  {
+    id: 'dify',
+    name: 'Dify',
+    url: 'https://dify.ai/',
+    icon: '🧩',
+    desc: '开源 LLM 应用平台',
+    tag: '免费/自托管',
+    tagClass: 'limited',
+    embed: false
+  },
+  {
+    id: 'flowith',
+    name: 'Flowith',
+    url: 'https://flowith.io/',
+    icon: '🌊',
+    desc: 'AI 工作流',
+    tag: '免费/限',
+    tagClass: 'limited',
+    embed: false
+  },
+  {
+    id: 'lechat',
+    name: 'Le Chat',
+    url: 'https://chat.mistral.ai/',
+    icon: '🐱',
+    desc: 'Mistral AI',
+    tag: '免费/限',
+    tagClass: 'limited',
+    embed: false
+  }
+];
+
+// =============================================
+// 状态管理
+// =============================================
+const STORE_KEY = 'cs_web_iframe_v1';
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
+}
+function saveState(state) {
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+}
+
+let state = loadState();
+if (!state.lastService) state.lastService = 'doubao';
+
+// =============================================
+// DOM 引用
+// =============================================
+const $ = id => document.getElementById(id);
+const serviceList = $('service-list');
+const aiFrame = $('ai-frame');
+const loading = $('loading');
+const fallbackView = $('fallback-view');
+const fallbackLink = $('fallback-link');
+const sidebar = $('sidebar');
+
+// =============================================
+// 渲染服务列表
+// =============================================
+function renderServiceList() {
+  serviceList.innerHTML = AI_SERVICES.map(svc => `
+    <div class="service-item ${svc.id === state.lastService ? 'active' : ''}" data-id="${svc.id}">
+      <div class="svc-icon" style="background:${stringToColor(svc.id)}">${svc.icon}</div>
+      <span class="svc-name">${escapeHtml(svc.name)}</span>
+      <span class="svc-tag ${svc.tagClass || ''}">${svc.tag}</span>
+    </div>
+  `).join('');
+
+  serviceList.querySelectorAll('.service-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const id = item.dataset.id;
+      switchService(id);
+      sidebar.classList.remove('open');
+    });
+  });
+}
+
+function stringToColor(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  const c = (hash & 0x00FFFFFF).toString(16).padStart(6, '0');
+  return '#' + c;
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// =============================================
+// 切换服务
+// =============================================
+function switchService(id) {
+  const svc = AI_SERVICES.find(s => s.id === id);
+  if (!svc) return;
+
+  // 更新状态
+  state.lastService = id;
+  saveState(state);
+
+  // 更新列表高亮
+  serviceList.querySelectorAll('.service-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.id === id);
+  });
+
+  // 重置视图
+  fallbackView.classList.remove('show');
+  loading.classList.remove('hide');
+
+  // 检查是否可嵌入
+  if (svc.embed === false) {
+    // 直接显示 fallback
+    showFallback(svc);
+    return;
+  }
+
+  // 尝试嵌入
+  aiFrame.src = svc.url;
+  
+  // 超时检测（如果 5 秒后还在加载，可能是被阻止了）
+  clearTimeout(window._loadTimeout);
+  window._loadTimeout = setTimeout(() => {
+    // 简单检测：如果 iframe 内容为空或无法访问，显示 fallback
+    try {
+      const doc = aiFrame.contentDocument || aiFrame.contentWindow?.document;
+      if (!doc || doc.body?.innerHTML === '') {
+        showFallback(svc);
+      }
+    } catch (e) {
+      // 跨域错误，说明加载了但无法访问，这是正常的
+      loading.classList.add('hide');
+    }
+  }, 5000);
+}
+
+// iframe 加载事件
+aiFrame.addEventListener('load', () => {
+  loading.classList.add('hide');
+  clearTimeout(window._loadTimeout);
+});
+
+aiFrame.addEventListener('error', () => {
+  const svc = AI_SERVICES.find(s => s.id === state.lastService);
+  showFallback(svc);
+});
+
+function showFallback(svc) {
+  loading.classList.add('hide');
+  fallbackView.classList.add('show');
+  fallbackLink.href = svc.url;
+  fallbackLink.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/>
+    </svg>
+    打开 ${escapeHtml(svc.name)}
+  `;
+}
+
+// =============================================
+// 侧边栏切换
+// =============================================
+$('btn-sidebar-toggle').addEventListener('click', () => {
+  sidebar.classList.toggle('open');
+});
+
+// =============================================
+// 刷新按钮
+// =============================================
+$('btn-reload').addEventListener('click', () => {
+  const svc = AI_SERVICES.find(s => s.id === state.lastService);
+  if (svc) {
+    fallbackView.classList.remove('show');
+    loading.classList.remove('hide');
+    aiFrame.src = svc.url;
+  }
+});
+
+// =============================================
+// 初始化
+// =============================================
+renderServiceList();
+switchService(state.lastService);
+</script>
+
+</body>
+</html>
